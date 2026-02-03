@@ -1,99 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>India Founder Scout | Antler</title>
-      <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>India Founder Scout | Antler</title>
+    <script src="https://cdn.tailwindcss.com"></script>
   </head>
-<body class="bg-gray-50 min-h-screen">
+  <body class="bg-gray-50 min-h-screen">
     <header class="bg-white border-b sticky top-0 z-50">
-            <div class="max-w-7xl mx-auto px-4 py-4">
-                        <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-3">
-                                                            <span class="text-2xl">🇮🇳</span>span>
-                                                            <div>
-                                                                                      <h1 class="text-xl font-bold text-gray-900">India Founder Scout</h1>h1>
-                                                                                      <p class="text-xs text-gray-500">Indie builders in AI/ML and Dev Tools</p>p>
-                                                            </div>
-                                        </div>
-                                          <div class="flex items-center gap-4">
-                                                                <input type="text" id="search" placeholder="Search..." class="px-3 py-2 border rounded-lg text-sm w-48">
-                                                                <select id="sort" class="px-3 py-2 border rounded-lg text-sm bg-white">
-                                                                                          <option value="overall_score">Score</option>option>
-                                                                                          <option value="total_stars">Stars</option>option>
-                                                                                          <option value="followers">Followers</option>option>
-                                                                </select>select>
-                                                                <span id="count" class="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm font-medium"></span>span>
-                                          </div>
-                        </div>
+      <div class="max-w-7xl mx-auto px-4 py-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🇮🇳</span>
+            <div>
+              <h1 class="text-xl font-bold text-gray-900">India Founder Scout</h1>
+              <p class="text-xs text-gray-500">Indie builders in AI/ML and Dev Tools</p>
             </div>
-    </header>header>
-      <main class="max-w-7xl mx-auto px-4 py-6">
-                <div id="grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-      </main>main>
-      <script>
-            let devs = [];
-            async function load() {
-                      const r = await fetch('developers.json');
-                      devs = await r.json();
-                      document.getElementById('count').textContent = devs.length + ' Builders';
-                      render();
-            }
-            function render() {
-                      const search = document.getElementById('search').value.toLowerCase();
-                      const sort = document.getElementById('sort').value;
-                      let filtered = devs.filter(d => 
-                                    (d.name + d.username + (d.bio||'') + (d.location||'')).toLowerCase().includes(search)
-                                                         );
-                      filtered.sort((a,b) => (b[sort]||0) - (a[sort]||0));
-                      document.getElementById('grid').innerHTML = filtered.map(d => `
-                                  <div class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md transition cursor-pointer" onclick="window.open('${d.html_url}')">
-                                                  <div class="flex items-start gap-4">
-                                                                      <img src="${d.avatar_url}" class="w-14 h-14 rounded-full" alt="${d.name}">
-                                                                                          <div class="flex-1 min-w-0">
-                                                                                                                  <h3 class="font-semibold text-gray-900 truncate">${d.name}</h3>
-                                                                                                                                          <p class="text-sm text-gray-500">@${d.username}</p>
-                                                                                                                                                                  <p class="text-xs text-gray-400 mt-1">📍 ${d.location || 'India'}</p>
-                                                                                                                                                                                      </div>
-                                                                                                                                                                                                          <div class="text-right">
-                                                                                                                                                                                                                                  <div class="text-2xl font-bold text-orange-500">${d.overall_score}</div>
-                                                                                                                                                                                                                                                          <div class="text-xs text-gray-400">score</div>
-                                                                                                                                                                                                                                                                              </div>
-                                                                                                                                                                                                                                                                                              </div>
-                                                                                                                                                                                                                                                                                                              <p class="text-sm text-gray-600 mt-3 line-clamp-2">${d.bio || 'Building amazing things'}</p>
-                                                                                                                                                                                                                                                                                                                              <div class="grid grid-cols-4 gap-2 mt-4 text-center text-xs">
-                                                                                                                                                                                                                                                                                                                                                  <div class="bg-green-50 rounded-lg p-2">
-                                                                                                                                                                                                                                                                                                                                                                          <div class="font-semibold text-green-600">${d.growth_score}</div>
-                                                                                                                                                                                                                                                                                                                                                                                                  <div class="text-gray-500">Growth</div>
-                                                                                                                                                                                                                                                                                                                                                                                                                      </div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                          <div class="bg-blue-50 rounded-lg p-2">
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                  <div class="font-semibold text-blue-600">${d.velocity_score}</div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          <div class="text-gray-500">Velocity</div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              </div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  <div class="bg-purple-50 rounded-lg p-2">
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          <div class="font-semibold text-purple-600">${d.undervalued_score}</div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  <div class="text-gray-500">Hidden</div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      </div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          <div class="bg-orange-50 rounded-lg p-2">
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  <div class="font-semibold text-orange-600">${d.pioneer_score}</div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          <div class="text-gray-500">Pioneer</div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              </div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              </div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              <div class="flex items-center justify-between mt-4 pt-3 border-t text-sm text-gray-500">
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  <span>⭐ ${(d.total_stars||0).toLocaleString()}</span>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      <span>👥 ${(d.followers||0).toLocaleString()}</span>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          <span>📦 ${d.public_repos||0} repos</span>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          </div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      </div>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              `).join('');
-            }
-            document.getElementById('search').addEventListener('input', render);
-            document.getElementById('sort').addEventListener('change', render);
-            load();
-      </script>
-</body>body>
-</html>html>
-      </script>
-                                                            </div></title>
-  </head>
+          </div>
+          <div class="flex items-center gap-4">
+            <input type="text" id="search" placeholder="Search..." class="px-3 py-2 border rounded-lg text-sm w-48">
+            <select id="sort" class="px-3 py-2 border rounded-lg text-sm bg-white">
+              <option value="overall_score">Score</option>
+              <option value="total_stars">Stars</option>
+              <option value="followers">Followers</option>
+            </select>
+            <span id="count" class="bg-orange-100 text-orange-700 px-3 py-1 rounded-full text-sm font-medium"></span>
+          </div>
+        </div>
+      </div>
+    </header>
+    <main class="max-w-7xl mx-auto px-4 py-6">
+      <div id="grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </main>
+    <script>
+      let devs = [];
+      async function load() {
+        const r = await fetch('developers.json');
+        devs = await r.json();
+        document.getElementById('count').textContent = devs.length + ' Builders';
+        render();
+      }
+      function render() {
+        const search = document.getElementById('search').value.toLowerCase();
+        const sort = document.getElementById('sort').value;
+        let filtered = devs.filter(d => 
+          d.name.toLowerCase().includes(search) || 
+          d.bio.toLowerCase().includes(search) ||
+          d.username.toLowerCase().includes(search)
+        );
+        filtered.sort((a, b) => b[sort] - a[sort]);
+        document.getElementById('grid').innerHTML = filtered.map(d => `
+          <div class="bg-white rounded-xl shadow-sm border hover:shadow-md transition-shadow p-5">
+            <div class="flex items-start justify-between mb-3">
+              <div class="flex items-center gap-3">
+                <img src="${d.avatar_url}" alt="${d.name}" class="w-12 h-12 rounded-full">
+                <div>
+                  <h3 class="font-semibold text-gray-900">${d.name}</h3>
+                  <a href="${d.html_url}" target="_blank" class="text-sm text-gray-500 hover:text-orange-600">@${d.username}</a>
+                  <p class="text-xs text-gray-400">${d.location || 'India'}</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-2xl font-bold text-orange-500">${d.overall_score}</span>
+                <p class="text-xs text-gray-400">score</p>
+              </div>
+            </div>
+            <p class="text-sm text-gray-600 mb-4 line-clamp-2">${d.bio}</p>
+            <div class="grid grid-cols-4 gap-2 mb-4">
+              <div class="text-center p-2 bg-green-50 rounded-lg">
+                <span class="block text-sm font-semibold text-green-700">${d.growth_score}</span>
+                <span class="text-xs text-gray-500">Growth</span>
+              </div>
+              <div class="text-center p-2 bg-blue-50 rounded-lg">
+                <span class="block text-sm font-semibold text-blue-700">${d.velocity_score}</span>
+                <span class="text-xs text-gray-500">Velocity</span>
+              </div>
+              <div class="text-center p-2 bg-purple-50 rounded-lg">
+                <span class="block text-sm font-semibold text-purple-700">${d.undervalued_score}</span>
+                <span class="text-xs text-gray-500">Hidden</span>
+              </div>
+              <div class="text-center p-2 bg-orange-50 rounded-lg">
+                <span class="block text-sm font-semibold text-orange-700">${d.pioneer_score}</span>
+                <span class="text-xs text-gray-500">Pioneer</span>
+              </div>
+            </div>
+            <div class="flex items-center justify-between text-sm text-gray-500 pt-3 border-t">
+              <span>⭐ ${d.total_stars.toLocaleString()}</span>
+              <span>👥 ${d.followers.toLocaleString()}</span>
+              <span>📦 ${d.public_repos} repos</span>
+            </div>
+          </div>
+        `).join('');
+      }
+      document.getElementById('search').addEventListener('input', render);
+      document.getElementById('sort').addEventListener('change', render);
+      load();
+    </script>
+  </body>
+</html>
