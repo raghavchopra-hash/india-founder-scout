@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-GitHub Founder Scout - India Focus
-Finds indie builders in India working on AI/ML and Developer Tools.
-Filters out corporate employees - only independent builders.
+Founder Scout - India Focus (GitHub + Hugging Face)
+Implements Antler's dual-platform scouting strategy.
 """
 
 import requests
@@ -11,300 +10,266 @@ import time
 import os
 from datetime import datetime, timedelta
 
-class IndiaScout:
-      def __init__(self, token: str):
-                self.token = token
-                self.headers = {
-                    'Authorization': f'token {token}',
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-                self.base_url = 'https://api.github.com'
 
-          # Keywords that indicate corporate employment (filter OUT)
-                self.corporate_keywords = [
-                    '@google', '@microsoft', '@meta', '@amazon', '@apple',
-                    '@netflix', '@uber', '@airbnb', '@stripe', '@shopify',
-                    '@twitter', '@x', '@oracle', '@ibm', '@salesforce',
-                    '@adobe', '@vmware', '@cisco', '@intel', '@nvidia',
-                    '@redhat', '@databricks', '@snowflake', '@mongodb',
-                    '@atlassian', '@github', '@gitlab', '@vercel', '@netlify'
-                ]
+class GitHubScout:
+    """GitHub scouting with Antler's search queries"""
 
-          # India location keywords
-                self.india_keywords = [
-                    'india', 'bangalore', 'bengaluru', 'delhi', 'mumbai',
-                    'hyderabad', 'chennai', 'pune', 'kolkata', 'gurgaon',
-                    'gurugram', 'noida', 'ahmedabad', 'jaipur', 'kochi',
-                    'thiruvananthapuram', 'indore', 'bhopal', 'lucknow',
-                    'chandigarh', 'coimbatore', 'nagpur', 'vadodara',
-                    'indian', 'bharat'
-                ]
-
-          # Pioneer/emerging tech keywords (boost score)
-                self.pioneer_keywords = [
-                    'llm', 'gpt', 'transformer', 'diffusion', 'langchain',
-                    'vector', 'embedding', 'rag', 'agent', 'ai', 'ml',
-                    'rust', 'zig', 'wasm', 'blockchain', 'web3', 'crypto',
-                    'mcp', 'claude', 'openai', 'anthropic'
-                ]
-
-      def _request(self, endpoint: str, params: dict = None) -> dict:
-                """Make a rate-limited request to GitHub API"""
-                url = f"{self.base_url}{endpoint}"
-                response = requests.get(url, headers=self.headers, params=params)
-
-          if response.status_code == 200:
-                        return response.json()
-elif response.status_code == 403:
-            print(f"Rate limited. Waiting...")
-            time.sleep(60)
-            return self._request(endpoint, params)
-else:
-            print(f"Error {response.status_code}: {response.text[:200]}")
-              return None
-
-    def is_india_based(self, location: str) -> bool:
-              """Check if location indicates India"""
-              if not location:
-                            return False
-                        location_lower = location.lower()
-        return any(kw in location_lower for kw in self.india_keywords)
-
-    def is_corporate(self, company: str, bio: str) -> bool:
-              """Check if user works at a big company"""
-        text = f"{company or ''} {bio or ''}".lower()
-        return any(kw in text for kw in self.corporate_keywords)
-
-    def is_indie_builder(self, user_data: dict) -> bool:
-              """Check if user is an independent builder"""
-        company = user_data.get('company', '') or ''
-        bio = user_data.get('bio', '') or ''
-
-        # Filter out corporate employees
-        if self.is_corporate(company, bio):
-                      return False
-
-        # Positive signals for indie builders
-        indie_signals = [
-                      'indie', 'founder', 'solo', 'building', 'creator',
-                      'maker', 'hacker', 'entrepreneur', 'bootstrapped',
-                      'open source', 'oss', 'side project', 'my own'
-        ]
-
-        text = f"{company} {bio}".lower()
-
-        # If no company or has indie signals, likely indie
-        if not company or company.strip() == '':
-                      return True
-                  if any(signal in text for signal in indie_signals):
-                                return True
-
-        # Small/unknown company is okay
-        if not company.startswith('@'):
-                      return True
-
-        return False
-
-    def calculate_scores(self, user: dict, repos: list) -> dict:
-              """Calculate outlier scores for a developer"""
-
-        total_stars = sum(r.get('stargazers_count', 0) for r in repos)
-        total_forks = sum(r.get('forks_count', 0) for r in repos)
-
-        # Growth score - stars relative to account age
-        try:
-                      created = datetime.fromisoformat(user['created_at'].replace('Z', '+00:00'))
-                      account_age_days = max(1, (datetime.now(created.tzinfo) - created).days)
-                      growth_score = min(100, (total_stars / account_age_days) * 50)
-                  except:
-            growth_score = 50
-
-        # Velocity score - recent activity
-        recent_repos = [r for r in repos if r.get('pushed_at', '') > (datetime.now() - timedelta(days=90)).isoformat()]
-        velocity_score = min(100, len(recent_repos) * 20)
-
-        # Undervalued score - high output, low followers
-        followers = user.get('followers', 1) or 1
-        output_ratio = (total_stars + len(repos) * 5) / followers
-        undervalued_score = min(100, output_ratio * 15)
-
-        # Pioneer score - working on emerging tech
-        pioneer_matches = 0
-        for repo in repos[:10]:
-                      desc = (repo.get('description', '') or '').lower()
-                      name = repo.get('name', '').lower()
-                      topics = [t.lower() for t in repo.get('topics', [])]
-
-            for keyword in self.pioneer_keywords:
-                              if keyword in desc or keyword in name or keyword in topics:
-                                                    pioneer_matches += 1
-                                                    break
-
-                      pioneer_score = min(100, (pioneer_matches / max(1, min(10, len(repos)))) * 100)
-
-        # Overall score
-        overall_score = (
-                      growth_score * 0.20 +
-                      velocity_score * 0.30 +
-                      undervalued_score * 0.25 +
-                      pioneer_score * 0.25
-        )
-
-        return {
-                      'total_stars': total_stars,
-                      'total_forks': total_forks,
-                      'growth_score': round(growth_score, 1),
-                      'velocity_score': round(velocity_score, 1),
-                      'undervalued_score': round(undervalued_score, 1),
-                      'pioneer_score': round(pioneer_score, 1),
-                      'overall_score': round(overall_score, 1)
-        }
-
-    def get_top_repos(self, repos: list) -> list:
-              """Get top repos with relevant info"""
-              sorted_repos = sorted(repos, key=lambda r: r.get('stargazers_count', 0), reverse=True)
-
-        top_repos = []
-        for repo in sorted_repos[:5]:
-                      if repo.get('fork', False):
-                                        continue
-                                    top_repos.append({
-                                                      'name': repo['name'],
-                                                      'description': (repo.get('description') or '')[:200],
-                                                      'stars': repo.get('stargazers_count', 0),
-                                                      'forks': repo.get('forks_count', 0),
-                                                      'language': repo.get('language'),
-                                                      'url': repo.get('html_url'),
-                                                      'topics': repo.get('topics', [])[:5]
-                                    })
-
-        return top_repos[:3]
-
-    def get_languages(self, repos: list) -> list:
-              """Get language distribution"""
-        languages = {}
-        for repo in repos:
-                      lang = repo.get('language')
-            if lang:
-                              languages[lang] = languages.get(lang, 0) + 1
-
-        return sorted(languages.items(), key=lambda x: x[1], reverse=True)[:5]
-
-    def search_india_builders(self, max_users: int = 100) -> list:
-              """Search for indie builders in India"""
-
-        developers = {}
-
-        # Search queries focused on India + tech
-        searches = [
-                      'location:india followers:>100 repos:>5',
-                      'location:bangalore followers:>50 repos:>3',
-                      'location:mumbai followers:>50 repos:>3',
-                      'location:delhi followers:>50 repos:>3',
-                      'location:hyderabad followers:>50 repos:>3',
-                      'location:pune followers:>50 repos:>3',
-                      'location:chennai followers:>50 repos:>3',
-                      'location:india language:python',
-                      'location:india language:typescript',
-                      'location:india language:rust',
-                      'location:india llm',
-                      'location:india ai agent',
-        ]
-
-        print("Searching for indie builders in India...")
-
-        for query in searches:
-                      print(f"  Searching: {query[:50]}...")
-
-            result = self._request('/search/users', {
-                              'q': query,
-                              'sort': 'followers',
-                              'order': 'desc',
-                              'per_page': 30
-            })
-
-            if result and 'items' in result:
-                              for user in result['items']:
-                                                    if user['login'] not in developers:
-                                                                              developers[user['login']] = user
-
-                                            time.sleep(2)  # Rate limiting
-
-        print(f"Found {len(developers)} potential developers. Filtering...")
-
-        # Enrich and filter
-        enriched = []
-
-        for i, (username, _) in enumerate(list(developers.items())[:max_users * 2]):
-                      if len(enriched) >= max_users:
-                                        break
-
-            print(f"  [{i+1}] Checking {username}...")
-
-            # Get full user details
-            user_data = self._re#!/usr/bin/env python3
-"""
-GitHub Founder Scout - India Focus
-Finds indie builders in India working on AI/ML and Developer Tools.
-Filters out corporate employees - only independent builders.
-"""
-
-import requests
-import json
-import time
-import os
-from datetime import datetime, timedelta
-
-class IndiaScout:
-      def __init__(self, token: str):
-                self.token = token
+    def __init__(self, token: str):
+        self.token = token
         self.headers = {
-                      'Authorization': f'token {token}',
-                      'Accept': 'application/vnd.github.v3+json'
+            'Authorization': f'token {token}',
+            'Accept': 'application/vnd.github.v3+json'
         }
         self.base_url = 'https://api.github.com'
 
-        # Keywords that indicate corporate employment (filter OUT)
         self.corporate_keywords = [
-                      '@google', '@microsoft', '@meta', '@amazon', '@apple',
-                      '@netflix', '@uber', '@airbnb', '@stripe', '@shopify',
-                      '@twitter', '@x', '@oracle', '@ibm', '@salesforce',
-                      '@adobe', '@vmware', '@cisco', '@intel', '@nvidia',
-                      '@redhat', '@databricks', '@snowflake', '@mongodb',
-                      '@atlassian', '@github', '@gitlab', '@vercel', '@netlify'
+            '@google', '@microsoft', '@meta', '@amazon', '@apple',
+            '@netflix', '@uber', '@stripe', '@shopify', '@oracle'
         ]
 
-        # India location keywords
         self.india_keywords = [
-                      'india', 'bangalore', 'bengaluru', 'delhi', 'mumbai',
-                      'hyderabad', 'chennai', 'pune', 'kolkata', 'gurgaon',
-                      'gurugram', 'noida', 'ahmedabad', 'jaipur', 'kochi',
-                      'thiruvananthapuram', 'indore', 'bhopal', 'lucknow',
-                      'chandigarh', 'coimbatore', 'nagpur', 'vadodara',
-                      'indian', 'bharat'
+            'india', 'bangalore', 'bengaluru', 'delhi', 'mumbai',
+            'hyderabad', 'chennai', 'pune', 'kolkata', 'gurgaon',
+            'noida', 'ahmedabad', 'jaipur', 'mysuru', 'rajasthan'
         ]
 
-        # Pioneer/emerging tech keywords (boost score)
         self.pioneer_keywords = [
-                      'llm', 'gpt', 'transformer', 'diffusion', 'langchain',
-                      'vector', 'embedding', 'rag', 'agent', 'ai', 'ml',
-                      'rust', 'zig', 'wasm', 'blockchain', 'web3', 'crypto',
-                      'mcp', 'claude', 'openai', 'anthropic'
+            'agentic', 'langchain', 'langgraph', 'pydantic-ai', 'mcp',
+            'rag', 'llm', 'gpt', 'transformer', 'embedding', 'vector',
+            'claude', 'openai', 'anthropic', 'fine-tuning', 'llama'
+        ]
+
+        self.founder_signals = [
+            'founder', 'co-founder', 'cto', 'ceo', 'building',
+            'creator', 'indie', 'bootstrapped', 'maker'
         ]
 
     def _request(self, endpoint: str, params: dict = None) -> dict:
-              """Make a rate-limited request to GitHub API"""
         url = f"{self.base_url}{endpoint}"
         response = requests.get(url, headers=self.headers, params=params)
-
         if response.status_code == 200:
-                      return response.json()
-elif response.status_code == 403:
-            print(f"Rate limited. Waiting...")
+            return response.json()
+        elif response.status_code == 403:
             time.sleep(60)
             return self._request(endpoint, params)
-else:
-            print(f"Error {response.status_code}: {response.text[:200]}")
+        return None
+
+    def search_founders(self, max_users: int = 50) -> list:
+        """Execute Antler's GitHub scouting strategy"""
+        developers = {}
+
+        # ANTLER SCOUTING QUERIES
+        searches = [
+            '"Founder" "Building" "agentic" location:India',
+            '"Co-founder" OR "CTO" "Agentic" location:India',
+            '"Building" "langgraph" location:India',
+            '"Founder" "langchain" location:India',
+            '"Founder" OR "CTO" "LLM" location:India',
+            '"Stealth" AND "agentic" location:India',
+            'location:india followers:>100 repos:>10',
+            'location:bangalore followers:>50 "founder"',
+            'location:india language:python "llm"',
+            'location:india language:python "langchain"',
+        ]
+
+        print("GitHub Scouting...")
+        for query in searches:
+            result = self._request('/search/users', {
+                'q': query, 'sort': 'followers', 'per_page': 30
+            })
+            if result and 'items' in result:
+                for user in result['items']:
+                    developers[user['login']] = user
+            time.sleep(2)
+
+        print(f"Found {len(developers)} potential founders")
+        return self._enrich_users(list(developers.values())[:max_users])
+
+    def _enrich_users(self, users: list) -> list:
+        enriched = []
+        for user in users:
+            user_data = self._request(f"/users/{user['login']}")
+            if not user_data or not self._is_india(user_data.get('location', '')):
+                continue
+
+            repos = self._request(f"/users/{user['login']}/repos", {'per_page': 30}) or []
+            scores = self._calculate_scores(user_data, repos)
+
+            enriched.append({
+                'username': user_data['login'],
+                'name': user_data.get('name') or user_data['login'],
+                'bio': (user_data.get('bio') or '')[:200],
+                'location': user_data.get('location', 'India'),
+                'followers': user_data.get('followers', 0),
+                'public_repos': user_data.get('public_repos', 0),
+                'avatar_url': user_data.get('avatar_url', ''),
+                'html_url': user_data.get('html_url', ''),
+                'source': 'github',
+                'top_repos': self._get_top_repos(repos),
+                'languages': self._get_languages(repos),
+                **scores
+            })
+            time.sleep(1)
+
+        return sorted(enriched, key=lambda x: x['overall_score'], reverse=True)
+
+    def _is_india(self, location: str) -> bool:
+        if not location:
+            return False
+        return any(kw in location.lower() for kw in self.india_keywords)
+
+    def _calculate_scores(self, user: dict, repos: list) -> dict:
+        total_stars = sum(r.get('stargazers_count', 0) for r in repos)
+
+        try:
+            created = datetime.fromisoformat(user['created_at'].replace('Z', '+00:00'))
+            days = max(1, (datetime.now(created.tzinfo) - created).days)
+            growth = min(100, (total_stars / days) * 50)
+        except:
+            growth = 50
+
+        cutoff = (datetime.now() - timedelta(days=90)).isoformat()
+        recent = len([r for r in repos if r.get('pushed_at', '') > cutoff])
+        velocity = min(100, recent * 20)
+
+        followers = max(1, user.get('followers', 1))
+        undervalued = min(100, ((total_stars + len(repos) * 5) / followers) * 15)
+
+        pioneer = 0
+        for repo in repos[:10]:
+            desc = (repo.get('description') or '').lower()
+            topics = ' '.join(repo.get('topics', []))
+            if any(kw in f"{desc} {topics}" for kw in self.pioneer_keywords):
+                pioneer += 15
+        pioneer = min(100, pioneer)
+
+        overall = growth * 0.2 + velocity * 0.3 + undervalued * 0.25 + pioneer * 0.25
+
+        return {
+            'total_stars': total_stars,
+            'growth_score': round(growth),
+            'velocity_score': round(velocity),
+            'undervalued_score': round(undervalued),
+            'pioneer_score': round(pioneer),
+            'overall_score': round(overall, 1)
+        }
+
+    def _get_top_repos(self, repos: list) -> list:
+        sorted_repos = sorted(repos, key=lambda r: r.get('stargazers_count', 0), reverse=True)
+        return [{
+            'name': r['name'],
+            'description': (r.get('description') or '')[:150],
+            'stars': r.get('stargazers_count', 0),
+            'language': r.get('language'),
+            'url': r.get('html_url'),
+            'topics': r.get('topics', [])[:5]
+        } for r in sorted_repos[:3] if not r.get('fork')]
+
+    def _get_languages(self, repos: list) -> list:
+        langs = {}
+        for r in repos:
+            if r.get('language'):
+                langs[r['language']] = langs.get(r['language'], 0) + 1
+        return sorted(langs.items(), key=lambda x: x[1], reverse=True)[:5]
+
+
+class HuggingFaceScout:
+    """Hugging Face scouting for ML builders"""
+
+    def __init__(self):
+        self.base_url = 'https://huggingface.co/api'
+
+    def search_indian_ml_builders(self, max_users: int = 20) -> list:
+        print("HuggingFace Scouting...")
+        builders = []
+
+        for term in ['india', 'indian', 'hindi', 'indic']:
+            try:
+                response = requests.get(f"{self.base_url}/models", params={'search': term, 'limit': 50})
+                if response.status_code == 200:
+                    for model in response.json():
+                        author = model.get('author', '')
+                        if author and author not in [b.get('username') for b in builders]:
+                            info = self._get_author_info(author, model)
+                            if info:
+                                builders.append(info)
+                time.sleep(1)
+            except:
+                pass
+
+        print(f"Found {len(builders)} HuggingFace builders")
+        return builders[:max_users]
+
+    def _get_author_info(self, username: str, model: dict) -> dict:
+        try:
+            models_resp = requests.get(f"{self.base_url}/models", params={'author': username})
+            models = models_resp.json() if models_resp.status_code == 200 else []
+
+            if len(models) < 2:
+                return None
+
+            total_downloads = sum(m.get('downloads', 0) for m in models)
+            total_likes = sum(m.get('likes', 0) for m in models)
+
+            growth = min(100, (total_downloads / 1000) * 10)
+            velocity = min(100, len(models) * 15)
+            undervalued = min(100, (total_downloads / max(1, total_likes)) * 5)
+            pioneer = min(100, len(models) * 10)
+            overall = (growth + velocity + undervalued + pioneer) / 4
+
+            return {
+                'username': username,
+                'name': username,
+                'bio': f"ML Builder - {len(models)} models on HuggingFace",
+                'location': 'India',
+                'followers': total_likes,
+                'public_repos': len(models),
+                'avatar_url': f"https://huggingface.co/avatars/{username}",
+                'html_url': f"https://huggingface.co/{username}",
+                'source': 'huggingface',
+                'total_stars': total_downloads,
+                'growth_score': round(growth),
+                'velocity_score': round(velocity),
+                'undervalued_score': round(undervalued),
+                'pioneer_score': round(pioneer),
+                'overall_score': round(overall, 1),
+                'top_repos': [{
+                    'name': m.get('id', '').split('/')[-1],
+                    'description': f"Downloads: {m.get('downloads', 0):,}",
+                    'stars': m.get('downloads', 0),
+                    'language': 'Python',
+                    'url': f"https://huggingface.co/{m.get('id', '')}",
+                    'topics': m.get('tags', [])[:5]
+                } for m in models[:3]],
+                'languages': [['Python', len(models)]]
+            }
+        except:
             return None
 
-    def is_india_based(self, location: str) -
+
+def main():
+    token = os.environ.get('GITHUB_TOKEN')
+    if not token:
+        print("GITHUB_TOKEN not set")
+        return
+
+    all_founders = []
+
+    github_scout = GitHubScout(token)
+    github_founders = github_scout.search_founders(max_users=30)
+    all_founders.extend(github_founders)
+
+    hf_scout = HuggingFaceScout()
+    hf_founders = hf_scout.search_indian_ml_builders(max_users=10)
+    all_founders.extend(hf_founders)
+
+    all_founders.sort(key=lambda x: x['overall_score'], reverse=True)
+
+    with open('developers.json', 'w') as f:
+        json.dump(all_founders, f, indent=2)
+
+    print(f"Saved {len(all_founders)} founders (GitHub: {len(github_founders)}, HF: {len(hf_founders)})")
+
+
+if __name__ == '__main__':
+    main()
